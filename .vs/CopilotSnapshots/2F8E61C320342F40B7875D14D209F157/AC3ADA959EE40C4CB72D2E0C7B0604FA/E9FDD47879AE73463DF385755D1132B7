@@ -1,0 +1,211 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using Ticket15.DAL;
+using Ticket15.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.DiaSymReader;
+using System.IO;
+
+namespace Ticket15.Areas.Admin.Controllers
+{
+    [Area("Admin")]
+    public class MemberController : Controller
+    {
+
+        public readonly AppDbContext _dbContext;
+        public readonly IWebHostEnvironment _env;
+        public MemberController(AppDbContext dbContext, IWebHostEnvironment env)
+        {
+            _dbContext = dbContext;
+            _env = env;
+        }
+        public async Task<IActionResult> Index()
+        {
+            List<Member> members = await _dbContext.Members.ToListAsync();
+            return View(members);
+        }
+
+
+
+        [HttpGet]
+        public IActionResult Create()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(Member member)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(member);
+            }
+
+            if (member.PhotoFile != null && member.PhotoFile.Length > 0)
+            {
+                if (!member.PhotoFile.ContentType.Contains("image/"))
+                {
+                    ModelState.AddModelError("PhotoFile", "Şəkil formatı yanlışdır");
+                    return View(member);
+                }
+
+                if (member.PhotoFile.Length > 2 * 1024 * 1024)
+                {
+                    ModelState.AddModelError("PhotoFile", "Şəkil ölçüsü 2MB-dan çox ola bilməz");
+                    return View(member);
+                }
+
+                string uploadsFolder = Path.Combine(_env.WebRootPath, "admin", "img");
+
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                string uniqueFileName = Guid.NewGuid().ToString() + "_" + member.PhotoFile.FileName;
+                string filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await member.PhotoFile.CopyToAsync(fileStream);
+                }
+
+                member.ImgUrl = uniqueFileName;
+            }
+
+            await _dbContext.Members.AddAsync(member);
+            await _dbContext.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
+        }
+
+
+
+
+
+
+
+
+
+
+        public IActionResult Update(int? id)
+        {
+            if (id == null || id == 0)
+                return BadRequest();
+
+            Member member = _dbContext.Members.FirstOrDefault(c => c.Id == id);
+            if (member == null)
+                return NotFound();
+
+            return View(member);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Update(int? id, Member member)
+        {
+            if (id == null || id < 1)
+                return BadRequest();
+
+            Member existed = _dbContext.Members.FirstOrDefault(c => c.Id == id);
+
+            if (existed is null)
+                return NotFound();
+
+            if (!ModelState.IsValid)
+            {
+                return View(existed);
+            }
+
+            // Handle photo upload if new photo is provided
+            if (member.PhotoFile != null && member.PhotoFile.Length > 0)
+            {
+                if (!member.PhotoFile.ContentType.Contains("image/"))
+                {
+                    ModelState.AddModelError("PhotoFile", "Şəkil formatı yanlışdır");
+                    return View(existed);
+                }
+
+                if (member.PhotoFile.Length > 2 * 1024 * 1024)
+                {
+                    ModelState.AddModelError("PhotoFile", "Şəkil ölçüsü 2MB-dan çox ola bilməz");
+                    return View(existed);
+                }
+
+                string uploadsFolder = Path.Combine(_env.WebRootPath, "admin", "img");
+
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                // Delete old image if exists
+                if (!string.IsNullOrEmpty(existed.ImgUrl))
+                {
+                    string oldFilePath = Path.Combine(uploadsFolder, existed.ImgUrl);
+                    if (System.IO.File.Exists(oldFilePath))
+                    {
+                        System.IO.File.Delete(oldFilePath);
+                    }
+                }
+
+                string uniqueFileName = Guid.NewGuid().ToString() + "_" + member.PhotoFile.FileName;
+                string filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await member.PhotoFile.CopyToAsync(fileStream);
+                }
+
+                existed.ImgUrl = uniqueFileName;
+            }
+
+            existed.FullName = member.FullName;
+            existed.Salary = member.Salary;
+            existed.Point = member.Point;
+            await _dbContext.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
+        }
+
+
+        public IActionResult Detail(int? id)
+        {
+            if (id == null || id < 1)
+                return BadRequest();
+
+            Member member = _dbContext.Members.FirstOrDefault(c => c.Id == id);
+            if (member == null)
+                return NotFound();
+
+            return View(member);
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> Delete(int? id)
+        {
+            if (id == null || id < 1)
+                return BadRequest();
+            Member member = await _dbContext.Members.FirstOrDefaultAsync(c => c.Id == id);
+            if (member == null)
+                return NotFound();
+
+            // Delete the image file if exists
+            if (!string.IsNullOrEmpty(member.ImgUrl))
+            {
+                string uploadsFolder = Path.Combine(_env.WebRootPath, "admin", "img");
+                string filePath = Path.Combine(uploadsFolder, member.ImgUrl);
+                if (System.IO.File.Exists(filePath))
+                {
+                    System.IO.File.Delete(filePath);
+                }
+            }
+
+            _dbContext.Members.Remove(member);
+            await _dbContext.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
+        }
+    }
+
+
+}
+

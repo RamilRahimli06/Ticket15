@@ -1,0 +1,106 @@
+﻿using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Ticket15.DAL;
+using Ticket15.Models;
+
+namespace Ticket15.Areas.Admin.Controllers
+{
+    [Area("Admin")]
+    public class AgentController : Controller
+    {
+        private readonly AppDbContext _context;
+
+        public AgentController(AppDbContext context)
+        {
+            _context = context;
+        }
+
+        public IActionResult Index()
+        {
+            List<Agent> agents = _context.Agents.ToList();
+            return View(agents);
+        }
+
+        public IActionResult Create()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Create(Agent agent)
+        {
+            if (!ModelState.IsValid)
+                return View(agent);
+
+            bool result = await _context.Agents.AnyAsync(a => a.FullName == agent.FullName);
+
+            if (result)
+            {
+                ModelState.AddModelError("FullName", "FullName already exists");
+                return View(agent);
+            }
+
+            await _context.Agents.AddAsync(agent);
+            await _context.SaveChangesAsync();
+            return RedirectToAction("Index");
+        }
+
+        public IActionResult Update(int? id)
+        {
+            if (id == null || id == 0)
+                return BadRequest();
+
+            Agent agent = _context.Agents.FirstOrDefault(c => c.Id == id);
+            if (agent == null)
+                return NotFound();
+
+            return View(agent);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Update(int? id, Agent agent)
+        {
+            if (id == null || id < 1)
+                return BadRequest();
+
+            Agent existed = _context.Agents.FirstOrDefault(c => c.Id == id);
+
+            if (existed is null)
+                return NotFound();
+
+            if (!ModelState.IsValid)
+            {
+                return View(existed);
+            }
+
+            bool result =await _context.Agents.AnyAsync(c => c.ImgUrl == agent.ImgUrl && c.Id != id);
+
+            if (result)
+            {
+                ModelState.AddModelError("ImgUrl", "ImgUrl already exists");
+                return View(existed);
+            }
+            existed.FullName = agent.FullName;
+            existed.Designation = agent.Designation;
+            existed.ImgUrl = agent.ImgUrl;
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
+        }
+
+
+        public IActionResult Delete(int? id)
+        {
+            if (id == null || id < 1)
+                return BadRequest();
+            Agent agent = _context.Agents.FirstOrDefault(c => c.Id == id);
+            if (agent == null)
+                return NotFound();
+            
+            _context.Agents.Remove(agent);
+            _context .SaveChanges();
+            return RedirectToAction(nameof(Index));
+        }
+    }
+}

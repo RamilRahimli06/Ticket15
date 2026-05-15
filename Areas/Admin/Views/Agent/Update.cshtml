@@ -1,0 +1,33 @@
+﻿@model Agent
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Update Agent</h6>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            <div class="form-group mb-3">
+                <label>FullName</label>
+                <input asp-for="FullName" value="@Model.FullName" type="text" class="form-control" />
+                <span asp-validation-for="FullName" style="color: red;"></span>
+            </div>
+
+            <div class="form-group mb-3">
+                <label>Designation</label>
+                <input asp-for="Designation" value="@Model.Designation" type="text" class="form-control" />
+                <span asp-validation-for="Designation" style="color: red;"></span>
+            </div>
+
+            <div class="form-group mb-3">
+                <label>Img Url</label>
+                <input asp-for="ImgUrl" value="@Model.ImgUrl" type="text" class="form-control" />
+                <span asp-validation-for="ImgUrl" style="color: red;"></span>
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn btn-success">Update</button>
+                <a asp-area="Admin" asp-controller="Agent" asp-action="Index" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

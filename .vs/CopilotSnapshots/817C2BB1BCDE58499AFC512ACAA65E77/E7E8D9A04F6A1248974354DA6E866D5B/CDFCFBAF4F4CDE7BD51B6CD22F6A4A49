@@ -1,0 +1,138 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using Ticket15.DAL;
+using Ticket15.Models;
+using Microsoft.AspNetCore.Hosting;
+
+namespace Ticket15.Areas.Admin.Controllers
+{
+    [Area("Admin")]
+    public class SlideController : Controller
+    {
+        public readonly AppDbContext _context;
+        private readonly IWebHostEnvironment _env;
+
+        public SlideController(AppDbContext context, IWebHostEnvironment env)
+        {
+            _context = context;
+            _env = env;
+        }
+
+        public IActionResult Index()
+        {
+            List<Slide> slides = _context.Slides.ToList();
+            return View(slides);
+        }
+
+        public IActionResult Create()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public IActionResult Create(Slide slide, IFormFile image)
+        {
+            if (!ModelState.IsValid)
+                return View(slide);
+
+            if (image != null)
+            {
+                string uploads = Path.Combine(_env.WebRootPath, "uploads", "slides");
+                if (!Directory.Exists(uploads)) Directory.CreateDirectory(uploads);
+                string fileName = Guid.NewGuid().ToString() + Path.GetExtension(image.FileName);
+                string filePath = Path.Combine(uploads, fileName);
+                using (var fs = new FileStream(filePath, FileMode.Create))
+                {
+                    image.CopyTo(fs);
+                }
+                slide.ImageUrl = "/uploads/slides/" + fileName;
+            }
+
+            _context.Slides.Add(slide);
+            _context.SaveChanges();
+            return RedirectToAction("Index");
+        }
+
+        public IActionResult Update(int? id)
+        {
+            if (id == null || id < 1)
+                return BadRequest();
+
+            Slide slide = _context.Slides.FirstOrDefault(s => s.Id == id);
+            if (slide == null)
+                return NotFound();
+
+            return View(slide);
+        }
+
+        [HttpPost]
+        public IActionResult Update(int? id, Slide slide, IFormFile image)
+        {
+            if (id == null || id < 1)
+                return BadRequest();
+
+            Slide existed = _context.Slides.FirstOrDefault(s => s.Id == id);
+            if (existed == null)
+                return NotFound();
+
+            if (!ModelState.IsValid)
+                return View(existed);
+
+            if (image != null)
+            {
+                string uploads = Path.Combine(_env.WebRootPath, "uploads", "slides");
+                if (!Directory.Exists(uploads)) Directory.CreateDirectory(uploads);
+                string fileName = Guid.NewGuid().ToString() + Path.GetExtension(image.FileName);
+                string filePath = Path.Combine(uploads, fileName);
+                using (var fs = new FileStream(filePath, FileMode.Create))
+                {
+                    image.CopyTo(fs);
+                }
+
+                if (!string.IsNullOrEmpty(existed.ImageUrl))
+                {
+                    string oldPath = Path.Combine(_env.WebRootPath, existed.ImageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                    if (System.IO.File.Exists(oldPath)) System.IO.File.Delete(oldPath);
+                }
+
+                existed.ImageUrl = "/uploads/slides/" + fileName;
+            }
+
+            existed.Title = slide.Title;
+            existed.Description = slide.Description;
+            _context.SaveChanges();
+            return RedirectToAction("Index");
+        }
+
+        public IActionResult Detail(int? id)
+        {
+            if (id == null || id < 1)
+                return BadRequest();
+
+            Slide slide = _context.Slides.FirstOrDefault(s => s.Id == id);
+            if (slide == null)
+                return NotFound();
+
+            return View(slide);
+        }
+
+        public IActionResult Delete(int? id)
+        {
+            if (id == null || id < 1)
+                return BadRequest();
+
+            Slide slide = _context.Slides.FirstOrDefault(s => s.Id == id);
+            if (slide == null)
+                return NotFound();
+
+            if (!string.IsNullOrEmpty(slide.ImageUrl))
+            {
+                string oldPath = Path.Combine(_env.WebRootPath, slide.ImageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                if (System.IO.File.Exists(oldPath)) System.IO.File.Delete(oldPath);
+            }
+
+            _context.Slides.Remove(slide);
+            _context.SaveChanges();
+            return RedirectToAction("Index");
+        }
+    }
+}
